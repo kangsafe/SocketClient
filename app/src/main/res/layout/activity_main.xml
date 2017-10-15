@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context="com.ks.socketclient.MainActivity">
+
+    <Button
+        android:text="开启客户端"
+        android:id="@+id/start"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+    <EditText
+        android:id="@+id/msg"
+        android:hint="发送给服务端"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+    <Button
+        android:id="@+id/send"
+        android:text="发送"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+    <Button
+        android:id="@+id/service"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:text="开启服务端"
+        android:layout_height="wrap_content" />
+</LinearLayout>
