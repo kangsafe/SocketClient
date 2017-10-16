@@ -8,18 +8,22 @@ import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
 import java.util.LinkedList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     Socket mSocket;
-    String mHost = "192.168.0.102";
+    String mHost = "192.168.1.116";
     int mPort = 2400;
     private final String TAG = "SocketClient";
     EditText textView;
@@ -43,7 +47,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             switch (msg.what) {
                 case 4:
                     Log.i(TAG, msg.obj.toString());
-                    dats.addLast(msg.obj.toString().getBytes());
+                    try {
+                        dats.addLast(msg.obj.toString().getBytes("GB2312"));
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
                     break;
                 case 3://
                     Log.i(TAG, "服务器已断开连接");
@@ -53,6 +61,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     break;
                 case 1://
                     Log.i(TAG, "来自服务器的消息：" + msg.obj.toString());
+                    MyApplication.exec(msg.obj.toString());
                     break;
             }
         }
@@ -84,7 +93,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (!textView.getText().toString().isEmpty()) {
                     Message msg = new Message();
                     msg.what = 4;
-                    msg.obj = textView.getText().toString();
+                    msg.obj = textView.getText().toString().trim();
                     handler.sendMessage(msg);
                 }
                 break;
@@ -107,10 +116,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 while (true) {
                     if (mSocket != null && !mSocket.isClosed() && mSocket.isConnected()) {
                         inputStream = mSocket.getInputStream();
+//                        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "gb2312"));
+//                        int b;
+//                        StringBuffer stringBuffer = new StringBuffer();
+//                        while ((b = reader.read()) != '\0') {
+//                            stringBuffer.append((char) b);
+//                        }
                         if (inputStream != null && inputStream.available() > 0) {
                             byte[] buf = new byte[inputStream.available()];
                             inputStream.read(buf);
-                            String text = new String(buf, "GBK");
+                            String text = new String(buf);
                             Message msg = new Message();
                             msg.what = 1;
                             msg.obj = text;
@@ -122,6 +137,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+                Log.i(TAG, "接收数据断开");
             }
         }
     }
@@ -178,20 +194,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     class ConnectRunnable implements Runnable {
         @Override
         public void run() {
-            try {
-                while (true) {
-                    if (mSocket == null || mSocket.isClosed() || !mSocket.isConnected()) {
+            while (true) {
+                try {
+                    Thread.sleep(10000);
+                    mSocket.sendUrgentData(0xFF);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    Log.i(TAG, "服务器已断开连接");
+                    try {
                         reConnect();
-                    } else {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
         }
     }
