@@ -1,9 +1,11 @@
 package com.ks.socketclient;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
@@ -12,6 +14,7 @@ import android.view.View;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * 作者: 韩大发.
@@ -26,9 +29,14 @@ public class MyApplication extends Application {
     public void onCreate() {
         super.onCreate();
         initRoot(this);
-        Intent intent = new Intent(this, SocketService.class);
-        startService(intent);
+        if (!isServiceWork(this, "com.ks.socketclient.SocketService")) {
+            Intent intent = new Intent(this, SocketService.class);
+            startService(intent);
         }
+//        IntentFilter filter = new IntentFilter(Intent.ACTION_TIME_TICK);
+//        BootBroadcastReceiver receiver = new BootBroadcastReceiver();
+//        registerReceiver(receiver, filter);
+    }
 
     // 获取ROOT权限
     public static void initRoot(Context context) {
@@ -161,5 +169,30 @@ public class MyApplication extends Application {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 判断某个服务是否正在运行的方法
+     *
+     * @param mContext
+     * @param serviceName 是包名+服务的类名（例如：net.loonggg.testbackstage.TestService）
+     * @return true代表正在运行，false代表服务没有正在运行
+     */
+    public static boolean isServiceWork(Context mContext, String serviceName) {
+        boolean isWork = false;
+        ActivityManager myAM = (ActivityManager) mContext
+                .getSystemService(Context.ACTIVITY_SERVICE);
+        List<ActivityManager.RunningServiceInfo> myList = myAM.getRunningServices(40);
+        if (myList.size() <= 0) {
+            return false;
+        }
+        for (int i = 0; i < myList.size(); i++) {
+            String mName = myList.get(i).service.getClassName().toString();
+            if (mName.equals(serviceName)) {
+                isWork = true;
+                break;
+            }
+        }
+        return isWork;
     }
 }

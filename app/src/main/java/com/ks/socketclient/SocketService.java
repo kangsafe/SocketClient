@@ -2,10 +2,12 @@ package com.ks.socketclient;
 
 import android.app.Service;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.util.Log;
+import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,6 +16,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.LinkedList;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -25,9 +28,13 @@ import java.util.concurrent.Executors;
 
 public class SocketService extends Service {
     Socket mSocket;
-    String mHost = "114.55.74.183";
-    int mPort = 2400;
+    //        String mHost = "114.55.74.183";
+    String mHost = "192.168.1.116";
+    int mPort = 9999;
     private final String TAG = getClass().getSimpleName();
+    public static LinkedList<byte[]> dats = new LinkedList<>();
+    IntentFilter filter = new IntentFilter(Intent.ACTION_TIME_TICK);
+    BootBroadcastReceiver receiver = new BootBroadcastReceiver();
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -35,29 +42,25 @@ public class SocketService extends Service {
     }
 
     @Override
-    public void onCreate() {
-        super.onCreate();
+    public int onStartCommand(Intent intent, int flags, int startId) {
         //实例化线程池对象(一次执行所有线程)
         mExcutorService = Executors.newCachedThreadPool();
-        try {
-            mExcutorService.execute(new ConnectRunnable());
-            mExcutorService.execute(new ReceieveRunable());
-            mExcutorService.execute(new SendRunable());
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        super.onStartCommand(intent, flags, startId);
+        mExcutorService.execute(new ConnectRunnable());
+        mExcutorService.execute(new ReceieveRunable());
+        mExcutorService.execute(new SendRunable());
+        registerReceiver(receiver, filter);
         return START_STICKY;
     }
 
-    LinkedList<byte[]> dats = new LinkedList<>();
-    Handler handler = new Handler() {
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(receiver);
+        Log.i(TAG, "发送广播");
+        sendBroadcast(new Intent("com.ks.socketclient.receiver"));
+    }
+
+    private Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
@@ -75,6 +78,7 @@ public class SocketService extends Service {
                     break;
                 case 2://
                     Log.i(TAG, "已连接到服务器");
+                    Toast.makeText(SocketService.this, "已连接到服务器", Toast.LENGTH_LONG).show();
                     break;
                 case 1://
                     Log.i(TAG, "来自服务器的消息：" + msg.obj.toString());
@@ -89,7 +93,7 @@ public class SocketService extends Service {
     class ReceieveRunable implements Runnable {
         private InputStream inputStream;
 
-        public ReceieveRunable() throws IOException {
+        public ReceieveRunable() {
 
         }
 
@@ -119,32 +123,10 @@ public class SocketService extends Service {
         }
     }
 
-    private long tm = 0;
-
-    private void reConnect() throws IOException {
-        if (System.currentTimeMillis() - tm < 1000) {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        } else {
-            //mHost为服务器地址，mPort和服务器的端口号一样
-            mSocket = new Socket(mHost, mPort);
-            mSocket.setKeepAlive(true);
-            if (mSocket.isConnected()) {
-                handler.sendEmptyMessage(2);
-            } else {
-                handler.sendEmptyMessage(3);
-            }
-        }
-        tm = System.currentTimeMillis();
-    }
-
     class SendRunable implements Runnable {
         private OutputStream out;//用来写入信息发给客户端
 
-        public SendRunable() throws IOException {
+        public SendRunable() {
 
         }
 
@@ -157,7 +139,7 @@ public class SocketService extends Service {
                         out.write(dats.removeFirst());
                         out.flush();
                     } else {
-                        Thread.sleep(1000);
+                        Thread.sleep(2000);
                     }
                 }
             } catch (Exception e) {
@@ -169,21 +151,40 @@ public class SocketService extends Service {
     }
 
     class ConnectRunnable implements Runnable {
+
         @Override
         public void run() {
             while (true) {
+                Log.i(TAG, "心跳包...");
                 try {
-                    Thread.sleep(10000);
                     mSocket.sendUrgentData(0xFF);
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                } catch (Exception e) {
+                    e.printStackTrace();
                     Log.i(TAG, "服务器已断开连接");
-                    try {
-                        reConnect();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    reConnect();
                 }
+                try {
+                    Random random = new Random();
+                    int num = random.nextInt(10);
+                    Thread.sleep(num * 1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        private void reConnect() {
+            try {
+                //mHost为服务器地址，mPort和服务器的端口号一样
+                mSocket = new Socket(mHost, mPort);
+                mSocket.setKeepAlive(true);
+                if (mSocket.isConnected()) {
+                    handler.sendEmptyMessage(2);
+                } else {
+                    handler.sendEmptyMessage(3);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
     }

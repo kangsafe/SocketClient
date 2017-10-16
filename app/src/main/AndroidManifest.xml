@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.ks.socketclient">
-
+    <!--开机启动-->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!--usb权限-->
+    <uses-feature android:name="android.hardware.usb.host" />
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:name=".MyApplication"
@@ -17,7 +20,16 @@
         <service
             android:name=".SocketService"
             android:persistent="true"
-            android:process=":service" />
+            android:process="${applicationId}.service" />
+        <receiver android:name=".BootBroadcastReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <action android:name="android.intent.action.TIME_TICK" />
+                <action android:name="com.ks.socketclient.receiver" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
