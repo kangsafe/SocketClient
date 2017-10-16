@@ -1,14 +1,11 @@
 package com.ks.socketclient;
 
-import android.app.Activity;
+import android.app.Service;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
 import android.util.Log;
-import android.view.View;
-import android.widget.EditText;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,28 +17,46 @@ import java.util.LinkedList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends Activity implements View.OnClickListener {
+/**
+ * Created by Admin on 2017/10/16 0016 13:07.
+ * Author: kang
+ * Email: kangsafe@163.com
+ */
+
+public class SocketService extends Service {
     Socket mSocket;
-    String mHost = "192.168.1.116";
+    String mHost = "114.55.74.183";
     int mPort = 2400;
-    private final String TAG = "SocketClient";
-    EditText textView;
+    private final String TAG = getClass().getSimpleName();
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        findViewById(R.id.start).setOnClickListener(this);
-        findViewById(R.id.service).setOnClickListener(this);
-        findViewById(R.id.send).setOnClickListener(this);
-        textView = (EditText) findViewById(R.id.msg);
-
-        //实例化线程池对象(一次执行所有线程)
-        mExcutorService = Executors.newCachedThreadPool();
-//        PackageManager p = getPackageManager();
-//        p.setComponentEnabledSetting(getComponentName(), PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
+    public IBinder onBind(Intent intent) {
+        return null;
     }
 
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        //实例化线程池对象(一次执行所有线程)
+        mExcutorService = Executors.newCachedThreadPool();
+        try {
+            mExcutorService.execute(new ConnectRunnable());
+            mExcutorService.execute(new ReceieveRunable());
+            mExcutorService.execute(new SendRunable());
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        super.onStartCommand(intent, flags, startId);
+        return START_STICKY;
+    }
+
+    LinkedList<byte[]> dats = new LinkedList<>();
     Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
@@ -69,42 +84,6 @@ public class MainActivity extends Activity implements View.OnClickListener {
         }
     };
 
-    //    List<byte[]> list = new ArrayList<>();
-    LinkedList<byte[]> dats = new LinkedList<>();
-
-    @Override
-    public void onClick(View view) {
-        switch (view.getId()) {
-            case R.id.start:
-                Intent intent = new Intent(this, SocketService.class);
-                startActivity(intent);
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            mExcutorService.execute(new ConnectRunnable());
-                            mExcutorService.execute(new ReceieveRunable());
-                            mExcutorService.execute(new SendRunable());
-                        } catch (UnknownHostException e) {
-                            e.printStackTrace();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }).start();
-                break;
-            case R.id.send:
-                if (!textView.getText().toString().isEmpty()) {
-                    Message msg = new Message();
-                    msg.what = 4;
-                    msg.obj = textView.getText().toString().trim();
-                    handler.sendMessage(msg);
-                }
-                break;
-        }
-
-    }
-
     private ExecutorService mExcutorService;//一个线程池
 
     class ReceieveRunable implements Runnable {
@@ -120,12 +99,6 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 while (true) {
                     if (mSocket != null && !mSocket.isClosed() && mSocket.isConnected()) {
                         inputStream = mSocket.getInputStream();
-//                        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "gb2312"));
-//                        int b;
-//                        StringBuffer stringBuffer = new StringBuffer();
-//                        while ((b = reader.read()) != '\0') {
-//                            stringBuffer.append((char) b);
-//                        }
                         if (inputStream != null && inputStream.available() > 0) {
                             byte[] buf = new byte[inputStream.available()];
                             inputStream.read(buf);

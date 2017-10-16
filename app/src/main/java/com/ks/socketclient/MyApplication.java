@@ -1,22 +1,17 @@
 package com.ks.socketclient;
 
 import android.app.Activity;
-import android.app.AlarmManager;
 import android.app.Application;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Build;
-import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 /**
  * 作者: 韩大发.
@@ -26,31 +21,14 @@ import java.util.Date;
  * 版本:1.0
  */
 public class MyApplication extends Application {
-    public static Context mContext;
 
     @Override
     public void onCreate() {
         super.onCreate();
         initRoot(this);
-        mContext = this;
-    }
-
-    /**
-     * 隐藏虚拟按键，并且全屏
-     */
-    public static void hideBottomUIMenu(Activity context) {
-        //隐藏虚拟按键，并且全屏
-        if (Build.VERSION.SDK_INT > 11 && Build.VERSION.SDK_INT < 19) { // lower api
-            View v = context.getWindow().getDecorView();
-            v.setSystemUiVisibility(View.GONE);
-        } else if (Build.VERSION.SDK_INT >= 19) {
-            //for new api versions.
-            View decorView = context.getWindow().getDecorView();
-            int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN;
-            decorView.setSystemUiVisibility(uiOptions);
+        Intent intent = new Intent(this, SocketService.class);
+        startService(intent);
         }
-    }
 
     // 获取ROOT权限
     public static void initRoot(Context context) {
