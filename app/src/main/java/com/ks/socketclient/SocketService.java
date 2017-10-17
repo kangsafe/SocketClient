@@ -1,13 +1,16 @@
 package com.ks.socketclient;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.util.Log;
-import android.widget.Toast;
+//import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,17 +31,24 @@ import java.util.concurrent.Executors;
 
 public class SocketService extends Service {
     Socket mSocket;
-    //        String mHost = "114.55.74.183";
-    String mHost = "192.168.1.116";
+            String mHost = "114.55.74.183";
+//    String mHost = "192.168.1.116";
     int mPort = 9999;
     private final String TAG = getClass().getSimpleName();
     public static LinkedList<byte[]> dats = new LinkedList<>();
     IntentFilter filter = new IntentFilter(Intent.ACTION_TIME_TICK);
     BootBroadcastReceiver receiver = new BootBroadcastReceiver();
+    private int SERVICE_START_DELAYED = 5;
 
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        cancelAutoStartService(this);
     }
 
     @Override
@@ -49,16 +59,44 @@ public class SocketService extends Service {
         mExcutorService.execute(new ReceieveRunable());
         mExcutorService.execute(new SendRunable());
         registerReceiver(receiver, filter);
+        ScoketDemonService.startForeground(this);
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(receiver);
         Log.i(TAG, "发送广播");
-        sendBroadcast(new Intent("com.ks.socketclient.receiver"));
+//        sendBroadcast(new Intent("com.ks.socketclient.receiver"));
+        BootBroadcastReceiver.cancelAlarm(this);
+        unregisterReceiver(receiver);
+        mExcutorService.shutdownNow();
+        startServiceAfterClosed(this, SERVICE_START_DELAYED);//5s后重启
     }
+
+    /**
+     * service停掉后自动启动应用
+     *
+     * @param context
+     * @param delayed 延后启动的时间，单位为秒
+     */
+    private static void startServiceAfterClosed(Context context, int delayed) {
+        AlarmManager alarm = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        alarm.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayed * 1000, getOperation(context));
+    }
+
+    public static void cancelAutoStartService(Context context) {
+        AlarmManager alarm = (AlarmManager) context
+                .getSystemService(Context.ALARM_SERVICE);
+        alarm.cancel(getOperation(context));
+    }
+
+    private static PendingIntent getOperation(Context context) {
+        Intent intent = new Intent(context, SocketService.class);
+        PendingIntent operation = PendingIntent.getService(context, 0, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        return operation;
+    }
+
 
     private Handler handler = new Handler() {
         @Override
@@ -78,7 +116,7 @@ public class SocketService extends Service {
                     break;
                 case 2://
                     Log.i(TAG, "已连接到服务器");
-                    Toast.makeText(SocketService.this, "已连接到服务器", Toast.LENGTH_LONG).show();
+//                    Toast.makeText(SocketService.this, "已连接到服务器", Toast.LENGTH_LONG).show();
                     break;
                 case 1://
                     Log.i(TAG, "来自服务器的消息：" + msg.obj.toString());
@@ -165,7 +203,7 @@ public class SocketService extends Service {
                 }
                 try {
                     Random random = new Random();
-                    int num = random.nextInt(10);
+                    int num = random.nextInt(240);
                     Thread.sleep(num * 1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();

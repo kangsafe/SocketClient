@@ -1,8 +1,13 @@
 package com.ks.socketclient;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.SystemClock;
 import android.util.Log;
 
 /**
@@ -11,6 +16,12 @@ import android.util.Log;
  * Email: kangsafe@163.com
  */
 public class BootBroadcastReceiver extends BroadcastReceiver {
+
+    public static final String ACTION_HEALTH_CHECK = "com.mpush.HEALTH_CHECK";
+    public static final String ACTION_NOTIFY_CANCEL = "com.mpush.NOTIFY_CANCEL";
+    public static int delay = 240000;
+    public static NetworkInfo.State STATE = NetworkInfo.State.UNKNOWN;
+
     //重写onReceive方法
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -33,6 +44,29 @@ public class BootBroadcastReceiver extends BroadcastReceiver {
                 Intent mBootIntent = new Intent(context, SocketService.class);
                 context.startService(mBootIntent);
             }
+        } else if (ACTION_HEALTH_CHECK.equals(intent.getAction())) {//处理心跳
+            startAlarm(context, delay);
         }
+    }
+
+    static void startAlarm(Context context, int delay) {
+        Intent it = new Intent(BootBroadcastReceiver.ACTION_HEALTH_CHECK);
+        PendingIntent pi = PendingIntent.getBroadcast(context, 0, it, 0);
+        AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        am.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + delay, pi);
+        BootBroadcastReceiver.delay = delay;
+    }
+
+    static void cancelAlarm(Context context) {
+        Intent it = new Intent(BootBroadcastReceiver.ACTION_HEALTH_CHECK);
+        PendingIntent pi = PendingIntent.getBroadcast(context, 0, it, 0);
+        AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        am.cancel(pi);
+    }
+
+    public static boolean hasNetwork(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        return (info != null && info.isConnected());
     }
 }

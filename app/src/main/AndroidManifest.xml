@@ -17,10 +17,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service android:name=".ScoketDemonService" />
         <service
             android:name=".SocketService"
             android:persistent="true"
             android:process="${applicationId}.service" />
+
         <receiver android:name=".BootBroadcastReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -28,6 +31,9 @@
 
                 <action android:name="android.intent.action.TIME_TICK" />
                 <action android:name="com.ks.socketclient.receiver" />
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+                <action android:name="com.mpush.HEALTH_CHECK" />
+                <action android:name="com.mpush.NOTIFY_CANCEL" />
             </intent-filter>
         </receiver>
     </application>
