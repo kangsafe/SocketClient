@@ -31,8 +31,8 @@ import java.util.concurrent.Executors;
 
 public class SocketService extends Service {
     Socket mSocket;
-            String mHost = "114.55.74.183";
-//    String mHost = "192.168.1.116";
+    String mHost = "114.55.74.183";
+    //    String mHost = "192.168.1.116";
     int mPort = 9999;
     private final String TAG = getClass().getSimpleName();
     public static LinkedList<byte[]> dats = new LinkedList<>();
