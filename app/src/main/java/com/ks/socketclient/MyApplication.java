@@ -14,6 +14,7 @@ import android.view.View;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 /**
@@ -159,15 +160,45 @@ public class MyApplication extends Application {
     }
 
     public static void exec(String cmd) {
+        DataOutputStream out = null;
+        InputStream inputStream = null;
+        Process process = null;
         try {
-            Process process = Runtime.getRuntime().exec("su");
-            DataOutputStream out = new DataOutputStream(
+            process = Runtime.getRuntime().exec("su");
+            out = new DataOutputStream(
                     process.getOutputStream());
             out.writeBytes(cmd + "\n");
+            out.flush();
+            inputStream = process.getInputStream();
+            if (inputStream != null && inputStream.available() > 0) {
+                byte[] buf = new byte[inputStream.available()];
+                inputStream.read(buf);
+                String str = new String(buf);
+                Log.i("数据", str);
+                SocketService.dats.addLast(buf);
+            }
             out.writeBytes("exit\n");
             out.flush();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+//            if (out != null) {
+//                try {
+//                    out.close();
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//            if (inputStream != null) {
+//                try {
+//                    inputStream.close();
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//            if (process != null) {
+//                process.destroy();
+//            }
         }
     }
 

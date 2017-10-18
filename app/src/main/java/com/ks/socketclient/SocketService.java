@@ -22,6 +22,8 @@ import java.util.LinkedList;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Admin on 2017/10/16 0016 13:07.
@@ -30,15 +32,22 @@ import java.util.concurrent.Executors;
  */
 
 public class SocketService extends Service {
-    Socket mSocket;
-    String mHost = "114.55.74.183";
-    //    String mHost = "192.168.1.116";
-    int mPort = 9999;
     private final String TAG = getClass().getSimpleName();
     public static LinkedList<byte[]> dats = new LinkedList<>();
     IntentFilter filter = new IntentFilter(Intent.ACTION_TIME_TICK);
     BootBroadcastReceiver receiver = new BootBroadcastReceiver();
     private int SERVICE_START_DELAYED = 5;
+    public static final int SOCKET_RECEIEVE = 1;
+    public static final int SOCKET_SEND = 2;
+    public static final int SOCKET_CONNECTED = 0;
+    public static final int SOCKET_CLOSED = -1;
+    public static final int SOCKET_ERROR = -2;
+    public static final int SOCKET_HEART = 3;
+    private ScheduledExecutorService mExcutorService;//一个线程池
+    //    String mHost = "114.55.74.183";
+    String mHost = "192.168.1.127";
+    int mPort = 9999;
+    public static boolean stop = false;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -54,13 +63,19 @@ public class SocketService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         //实例化线程池对象(一次执行所有线程)
-        mExcutorService = Executors.newCachedThreadPool();
-        mExcutorService.execute(new ConnectRunnable());
-        mExcutorService.execute(new ReceieveRunable());
-        mExcutorService.execute(new SendRunable());
+        mExcutorService = Executors.newScheduledThreadPool(3);
+        Connect();
         registerReceiver(receiver, filter);
         ScoketDemonService.startForeground(this);
         return START_STICKY;
+    }
+
+    private void init(Socket mSocket) {
+        if (!isConnecting) {
+            mExcutorService.scheduleWithFixedDelay(new HeartRunnable(mSocket, handler), 0, 10, TimeUnit.SECONDS);
+            mExcutorService.execute(new ReceieveRunable(mSocket, handler));
+            mExcutorService.execute(new SendRunable(mSocket, handler));
+        }
     }
 
     @Override
@@ -98,132 +113,74 @@ public class SocketService extends Service {
     }
 
 
-    private Handler handler = new Handler() {
+    Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             switch (msg.what) {
-                case 4:
-                    Log.i(TAG, msg.obj.toString());
-                    try {
-                        dats.addLast(msg.obj.toString().getBytes("GB2312"));
-                    } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case 3://
-                    Log.i(TAG, "服务器已断开连接");
-                    break;
-                case 2://
+                //已连接
+                case SocketService.SOCKET_CONNECTED: {
                     Log.i(TAG, "已连接到服务器");
-//                    Toast.makeText(SocketService.this, "已连接到服务器", Toast.LENGTH_LONG).show();
+                    init((Socket) msg.obj);
+                }
+                break;
+                //与服务器断开连接
+                case SocketService.SOCKET_CLOSED: {
+                    Log.i(TAG, "服务器已断开连接");
+                    mExcutorService.shutdownNow();
+                    Connect();
+                }
+                break;
+                //发送数据
+                case SocketService.SOCKET_SEND: {
+                    Log.i(TAG, new String((byte[]) msg.obj));
                     break;
-                case 1://
+                }
+                //接收数据
+                case SOCKET_RECEIEVE: {
                     Log.i(TAG, "来自服务器的消息：" + msg.obj.toString());
                     MyApplication.exec(msg.obj.toString());
+                }
+                break;
+                case SOCKET_ERROR: {
+                    Log.i(TAG, "Socket 错误");
+                }
+                break;
+                case SOCKET_HEART:
+                    Log.i(TAG, "心跳包...");
+                    break;
+                default:
                     break;
             }
         }
     };
+    private boolean isConnecting = false;
 
-    private ExecutorService mExcutorService;//一个线程池
-
-    class ReceieveRunable implements Runnable {
-        private InputStream inputStream;
-
-        public ReceieveRunable() {
-
-        }
-
-        @Override
-        public void run() {
-            try {
-                while (true) {
-                    if (mSocket != null && !mSocket.isClosed() && mSocket.isConnected()) {
-                        inputStream = mSocket.getInputStream();
-                        if (inputStream != null && inputStream.available() > 0) {
-                            byte[] buf = new byte[inputStream.available()];
-                            inputStream.read(buf);
-                            String text = new String(buf);
+    private void Connect() {
+        if (!isConnecting) {
+            isConnecting = true;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        //mHost为服务器地址，mPort和服务器的端口号一样
+                        Socket mSocket = new Socket(mHost, mPort);
+                        mSocket.setKeepAlive(true);
+                        if (mSocket.isConnected()) {
                             Message msg = new Message();
-                            msg.what = 1;
-                            msg.obj = text;
+                            msg.obj = mSocket;
+                            msg.what = SocketService.SOCKET_CONNECTED;
                             handler.sendMessage(msg);
+                        } else {
+                            handler.sendEmptyMessage(SocketService.SOCKET_CLOSED);
                         }
-                    } else {
-                        Thread.sleep(1000);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        handler.sendEmptyMessage(SocketService.SOCKET_CLOSED);
                     }
+                    isConnecting = false;
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-                Log.i(TAG, "接收数据断开");
-            }
-        }
-    }
-
-    class SendRunable implements Runnable {
-        private OutputStream out;//用来写入信息发给客户端
-
-        public SendRunable() {
-
-        }
-
-        @Override
-        public void run() {
-            try {
-                while (true) {
-                    if (mSocket != null && !mSocket.isClosed() && mSocket.isConnected() && dats != null && dats.size() > 0) {
-                        out = mSocket.getOutputStream();
-                        out.write(dats.removeFirst());
-                        out.flush();
-                    } else {
-                        Thread.sleep(2000);
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-
-            }
-        }
-    }
-
-    class ConnectRunnable implements Runnable {
-
-        @Override
-        public void run() {
-            while (true) {
-                Log.i(TAG, "心跳包...");
-                try {
-                    mSocket.sendUrgentData(0xFF);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    Log.i(TAG, "服务器已断开连接");
-                    reConnect();
-                }
-                try {
-                    Random random = new Random();
-                    int num = random.nextInt(240);
-                    Thread.sleep(num * 1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-
-        private void reConnect() {
-            try {
-                //mHost为服务器地址，mPort和服务器的端口号一样
-                mSocket = new Socket(mHost, mPort);
-                mSocket.setKeepAlive(true);
-                if (mSocket.isConnected()) {
-                    handler.sendEmptyMessage(2);
-                } else {
-                    handler.sendEmptyMessage(3);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            }).start();
         }
     }
 }

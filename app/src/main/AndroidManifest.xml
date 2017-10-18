@@ -21,8 +21,7 @@
         <service android:name=".ScoketDemonService" />
         <service
             android:name=".SocketService"
-            android:persistent="true"
-            android:process="${applicationId}.service" />
+            android:persistent="true" />
 
         <receiver android:name=".BootBroadcastReceiver">
             <intent-filter>
