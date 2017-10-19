@@ -25,6 +25,18 @@ public class SocketClient {
     private TimerTask heartBeatTask;
 
     private SocketClient() {
+        heartBeatTimer = new Timer("心跳", true);
+        heartBeatTask = new TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    socketTcp.sendUrgentData(0xFF);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        heartBeatTimer.scheduleAtFixedRate(heartBeatTask, 10 * 1000, 10 * 1000);
     }
 
     private static SocketClient socketClient;
@@ -41,6 +53,58 @@ public class SocketClient {
             }
         }
         return socketClient;
+    }
+
+    private String ip;
+    private int port;
+    private SocketUtil socketUtil;
+
+    public SocketClient connnect(final String ip, final int port) {
+        this.ip = ip;
+        this.port = port;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    socketTcp = new Socket(ip, port);
+                    socketUtil = new SocketUtil(socketTcp);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+        return this;
+    }
+
+    public SocketClient setCallBack(CallBackSocketTCP call) {
+        while (true) {
+            try {
+                boolean ba = socketUtil.isConnect();
+                //把值给接口，这里的接口作用，就是传值的作用
+                call.isConnect(ba);
+                System.out.println("当前Soket是否连接：" + ba);
+                String info = socketUtil.receiveData();
+                //同理
+                call.Receive(info);
+                System.out.println(" 服务器说：" + info);
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public SocketClient sendData(String data) {
+        try {
+            socketUtil.sendData(data);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return this;
     }
 
     /**
@@ -84,7 +148,7 @@ public class SocketClient {
     /**
      * UDP连接，
      *
-     * @param port 端口号
+     * @param port  端口号
      * @param datas 通过UDP发送的数据
      */
     public void getUDPConnect(int port, String datas, CallBackSocketUDP call) {

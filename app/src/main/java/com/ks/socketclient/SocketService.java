@@ -64,7 +64,23 @@ public class SocketService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         //实例化线程池对象(一次执行所有线程)
         mExcutorService = Executors.newScheduledThreadPool(3);
-        Connect();
+//        Connect();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                SocketClient.getSingle().getTCPConnect(mHost, mPort, "nihao", new CallBackSocketTCP() {
+                    @Override
+                    public void Receive(String info) {
+                        Log.i("receive", info);
+                    }
+
+                    @Override
+                    public void isConnect(boolean state) {
+                        Log.i("reveieve", state + "");
+                    }
+                });
+            }
+        }).start();
         registerReceiver(receiver, filter);
         ScoketDemonService.startForeground(this);
         return START_STICKY;
