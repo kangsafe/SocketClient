@@ -8,6 +8,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.LinkedList;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -98,11 +99,22 @@ public class SocketClient {
         }
     }
 
-    public SocketClient sendData(String data) {
+    LinkedList<String> datas = new LinkedList<>();
+
+    public synchronized SocketClient sendData(String data) {
         try {
-            socketUtil.sendData(data);
+            if (socketUtil != null && socketUtil.isConnect()) {
+                if (datas.size() > 0) {
+                    for (String str : datas
+                            ) {
+                        socketUtil.sendData(datas.removeFirst());
+                    }
+                }
+                socketUtil.sendData(data);
+            }
         } catch (IOException e) {
             e.printStackTrace();
+            datas.addLast(data);
         }
         return this;
     }
